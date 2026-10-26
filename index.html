@@ -21,7 +21,7 @@
     <ul class="key-results" aria-label="Key results">
       <li><span class="value">196 + 1</span><span class="label">patch tokens + CLS token for a 224×224 image with 16×16 patches</span></li>
       <li><span class="value">85%</span><span class="label">ViT-B/16 top-1 accuracy over all 1,000 ImageNet classes (17 / 20)</span></li>
-      <li><span class="value">5.7×10<sup>−6</sup></span><span class="label">max. difference between our CLIP logits and CLIP's built-in logits (FP32)</span></li>
+      <li><span class="value">5.7×10<sup>−6</sup></span><span class="label">max. difference between my CLIP logits and CLIP's built-in logits (FP32)</span></li>
       <li><span class="value">100%</span><span class="label">CLIP zero-shot accuracy for each of the three prompt templates (5 candidates)</span></li>
     </ul>
   </div>
@@ -53,18 +53,18 @@
 <!-- ============================================================ 1 -->
 <section id="overview">
 <h2><span class="num">1</span>Overview and objectives</h2>
-<p>This project examines two pretrained models on the same collection of 20 photographs. No model is trained or fine-tuned: both are used with their fixed public weights, in evaluation mode and with gradients disabled.</p>
+<p>In this project I looked at two pretrained models using the same 20 photographs. I didn't train or fine-tune either model. Both of them are used with their fixed public weights, in evaluation mode and with gradients turned off.</p>
 <ul>
-  <li><b>Part 1 — a pretrained Vision Transformer.</b> Using torchvision's <code>vit_b_16</code> with the <code>ViT_B_16_Weights.IMAGENET1K_V1</code> checkpoint, we implement patch extraction ourselves, trace how an image becomes a sequence of tokens, and evaluate the model's 1,000-class ImageNet predictions.</li>
-  <li><b>Part 2 — CLIP for image–text matching.</b> Using OpenAI CLIP <code>ViT-B/32</code>, we implement the image–text similarity computation step by step and verify it against the model's built-in output, compare three prompt templates for zero-shot classification, and study the similarity structure of CLIP's image embeddings.</li>
+  <li><b>Part 1: a pretrained Vision Transformer.</b> Using torchvision's <code>vit_b_16</code> with the <code>ViT_B_16_Weights.IMAGENET1K_V1</code> checkpoint, I wrote my own patch extraction, looked at how an image turns into a sequence of tokens, and evaluated the model's 1,000-class ImageNet predictions.</li>
+  <li><b>Part 2: CLIP for image–text matching.</b> Using OpenAI CLIP <code>ViT-B/32</code>, I implemented the image–text similarity calculation step by step and checked it against the model's built-in output. I also compared three prompt templates for zero-shot classification and looked at how similar CLIP's image embeddings are to each other.</li>
 </ul>
-<p>All numbers on this page come from the executed experiments. Where a result is exploratory rather than required, it is labeled <em>supplementary</em>.</p>
+<p>All the numbers on this page come from the experiments I actually ran. When a result is extra and not required by the assignment, I labeled it <em>supplementary</em>.</p>
 </section>
 
 <!-- ============================================================ 2 -->
 <section id="dataset">
 <h2><span class="num">2</span>Dataset and category definitions</h2>
-<p>The collection has 20 photographs: four for each of five classes from the ImageNet-1k label list. The class order below is used in every table, confusion matrix and list of CLIP candidate texts.</p>
+<p>The collection has 20 photographs, four for each of five classes from the ImageNet-1k label list. I used the class order below for every table, confusion matrix and list of CLIP candidate texts.</p>
 <div class="table-wrap">
 <table>
   <caption>Table 1. Categories and exact label mapping.</caption>
@@ -78,8 +78,8 @@
   </tbody>
 </table>
 </div>
-<p>For ViT we keep the checkpoint's exact label for class 281, <code>tabby</code>; for CLIP we use the clearer phrase <code>tabby cat</code>. The label mapping was checked against <code>weights.meta["categories"]</code> of the installed checkpoint.</p>
-<p><b>Sources and permissions.</b> All images come from Wikimedia Commons under CC0, public-domain, CC BY or CC BY-SA licenses (full attribution in <a href="#attribution">Section 13</a>). They were chosen to vary viewpoint, background, lighting and composition — for example a dog standing in a lake, a cat on snow, the rear view of a car, three riders on a mountain, and a mug held outdoors. Each image was checked visually so that its main object matches its class. For two golden-retriever photos the breed identification relies on the uploader's file title; the dogs are consistent with the breed, but this was not verified independently. Every original file was downloaded unmodified, checked against the SHA-1 checksum published by Commons, and recorded with its SHA-256 checksum, source page, creator and license.</p>
+<p>For ViT I kept the checkpoint's exact label for class 281, which is <code>tabby</code>, but for CLIP I used <code>tabby cat</code> because it's a clearer phrase. I checked the label mapping against <code>weights.meta["categories"]</code> of the installed checkpoint.</p>
+<p><b>Sources and permissions.</b> All the images come from Wikimedia Commons under CC0, public-domain, CC BY or CC BY-SA licenses (the full attribution is in <a href="#attribution">Section 13</a>). I picked them so the viewpoint, background, lighting and composition would vary, for example a dog standing in a lake, a cat on snow, the rear view of a car, three riders on a mountain, and a mug held outdoors. I looked at each image to make sure its main object actually matches its class. For two of the golden retriever photos, the breed comes from the uploader's file title. The dogs look consistent with the breed, but I didn't verify this independently. Every original file was downloaded without changes, checked against the SHA-1 checksum published by Commons, and recorded with its SHA-256 checksum, source page, creator and license.</p>
 </section>
 
 <!-- ============================================================ 3 -->
@@ -116,24 +116,24 @@
   </tbody>
 </table>
 </div>
-<p>Both pipelines use a center crop, so the far sides of wide photographs and the top and bottom of tall photographs are not seen by the models.</p>
+<p>Both pipelines use a center crop, which means the models don't see the far sides of wide photographs or the top and bottom of tall photographs.</p>
 </section>
 
 <!-- ============================================================ 4 -->
 <section id="patches">
 <h2><span class="num">4</span>ViT patch visualization and model inputs</h2>
 <h3>Dividing an image into patches</h3>
-<p>We wrote our own patch-extraction function using only tensor reshaping: an image of shape (3, 224, 224) is reshaped to (3, 14, 16, 14, 16), the axes are reordered to (14, 14, 3, 16, 16), and the result is flattened to (196, 3, 16, 16). With patch size <i>P</i> = 16,</p>
+<p>I wrote my own patch-extraction function that only uses tensor reshaping. An image of shape (3, 224, 224) is reshaped to (3, 14, 16, 14, 16), then the axes are reordered to (14, 14, 3, 16, 16), and then the result is flattened to (196, 3, 16, 16). With patch size <i>P</i> = 16,</p>
 <math display="block">
   <mi>N</mi><mo>=</mo>
   <mfrac><mn>224</mn><mn>16</mn></mfrac><mo>×</mo><mfrac><mn>224</mn><mn>16</mn></mfrac>
   <mo>=</mo><mn>14</mn><mo>×</mo><mn>14</mn><mo>=</mo><mn>196</mn>
   <mtext>&#8195;patches.</mtext>
 </math>
-<p>Patches are numbered in row-major order (patch <i>k</i> lies in row ⌊<i>k</i>/14⌋ and column <i>k</i> mod 14), and each contains 3 × 16 × 16 = 768 raw pixel values. Automated tests confirm the shapes, the ordering, exact reconstruction of the image from its patches, and that every pixel belongs to exactly one patch.</p>
+<p>The patches are numbered in row-major order (patch <i>k</i> is in row ⌊<i>k</i>/14⌋ and column <i>k</i> mod 14), and each one has 3 × 16 × 16 = 768 raw pixel values. I also wrote automated tests that check the shapes, the ordering, that the image can be rebuilt exactly from its patches, and that every pixel belongs to exactly one patch.</p>
 <figure>
   <img src="figures/p1t1_patch_grid.jpg" alt="Left: original photograph of a tabby cat on snow. Right: the 224 by 224 model input with a 14 by 14 grid of numbered 16-pixel patches." loading="lazy">
-  <figcaption><b>Figure 1.</b> Left: original photograph (3000×2000). Right: the 224×224 image the model receives after the checkpoint's resize and center crop, divided into 196 numbered 16×16 patches. This grid is our own visualization of raw pixels.</figcaption>
+  <figcaption><b>Figure 1.</b> Left: original photograph (3000×2000). Right: the 224×224 image the model receives after the checkpoint's resize and center crop, divided into 196 numbered 16×16 patches. This grid is my own visualization of raw pixels.</figcaption>
 </figure>
 <figure>
   <img src="figures/p1t1_individual_patches.jpg" alt="All 196 patches laid out with white gaps, and six individual patches enlarged with their row and column." loading="lazy">
@@ -141,11 +141,11 @@
 </figure>
 
 <h3>From patches to the 197-token sequence</h3>
-<p>The patch grid above contains nothing learned. Inside the pretrained model, three learned components turn the patches into the encoder's input:</p>
+<p>The patch grid above doesn't contain anything learned. Inside the pretrained model, there are three learned parts that turn the patches into the encoder's input:</p>
 <ol>
-  <li><b>Patch projection.</b> Each flattened patch <i>x<sub>p</sub></i> ∈ ℝ<sup>768</sup> is mapped to a <i>D</i> = 768-dimensional embedding <i>z<sub>p</sub></i> = <i>W x<sub>p</sub></i> + <i>b</i>, with a learned <i>W</i> ∈ ℝ<sup>768×768</sup>. torchvision implements this as a convolution with kernel size and stride 16, which is the same linear map applied to every non-overlapping patch.</li>
-  <li><b>CLS token.</b> A learned vector is placed in front of the 196 patch tokens, giving <b>196 + 1 = 197 tokens</b>. It contains no pixels; through self-attention it collects information from all patches, and its final state is the only input to the classification head.</li>
-  <li><b>Positional embeddings.</b> Self-attention treats its input as an unordered set, so a learned matrix <i>E</i><sub>pos</sub> ∈ ℝ<sup>197×768</sup> (one row per position, including the CLS position) is added to tell the encoder where each token came from.</li>
+  <li><b>Patch projection.</b> Each flattened patch <i>x<sub>p</sub></i> ∈ ℝ<sup>768</sup> gets mapped to a <i>D</i> = 768-dimensional embedding <i>z<sub>p</sub></i> = <i>W x<sub>p</sub></i> + <i>b</i>, where <i>W</i> ∈ ℝ<sup>768×768</sup> is learned. torchvision does this with a convolution that has a kernel size and stride of 16, which is basically the same linear map applied to every non-overlapping patch.</li>
+  <li><b>CLS token.</b> A learned vector is put in front of the 196 patch tokens, which gives <b>196 + 1 = 197 tokens</b>. It doesn't contain any pixels. Through self-attention it collects information from all the patches, and its final state is the only thing that goes into the classification head.</li>
+  <li><b>Positional embeddings.</b> Self-attention by itself treats its input like an unordered set, so a learned matrix <i>E</i><sub>pos</sub> ∈ ℝ<sup>197×768</sup> (one row per position, including the CLS position) is added to tell the encoder where each token came from.</li>
 </ol>
 <math display="block">
   <msub><mi>z</mi><mn>0</mn></msub><mo>=</mo>
@@ -161,25 +161,25 @@
   <caption>Table 4. Shapes along the input pipeline (one image).</caption>
   <thead><tr><th>Stage</th><th>Shape</th><th>Learned?</th></tr></thead>
   <tbody>
-    <tr><td>Raw patches (our function)</td><td>(196, 3, 16, 16)</td><td>no</td></tr>
-    <tr><td>Flattened patches (our function)</td><td>(196, 768)</td><td>no</td></tr>
+    <tr><td>Raw patches (my function)</td><td>(196, 3, 16, 16)</td><td>no</td></tr>
+    <tr><td>Flattened patches (my function)</td><td>(196, 768)</td><td>no</td></tr>
     <tr><td>Patch embeddings (projection)</td><td>(1, 196, 768)</td><td>yes</td></tr>
     <tr><td>+ CLS token</td><td>(1, 197, 768)</td><td>yes</td></tr>
     <tr><td>+ positional embeddings = encoder input</td><td>(1, 197, 768)</td><td>yes</td></tr>
   </tbody>
 </table>
 </div>
-<p><b>Manual patches vs. learned projection.</b> To connect the two, we multiplied our manually extracted, flattened patches by the model's projection weights. The result reproduces the model's own patch embeddings with a maximum absolute difference of 4.3×10<sup>−6</sup>, which is floating-point rounding. The patch length 3·16·16 = 768 and the model width <i>D</i> = 768 are equal for ViT-B/16 only by coincidence; they are different quantities.</p>
+<p><b>Manual patches vs. learned projection.</b> To connect these two things, I multiplied my manually extracted, flattened patches by the model's projection weights. The result matches the model's own patch embeddings with a maximum absolute difference of 4.3×10<sup>−6</sup>, which is just floating-point rounding. The patch length 3·16·16 = 768 and the model width <i>D</i> = 768 are only equal for ViT-B/16 by coincidence, and they're actually different quantities.</p>
 <figure>
   <img src="figures/p1t1_position_embedding_similarity.png" alt="Four 14 by 14 heatmaps of cosine similarity between one patch position's embedding and all other positions." loading="lazy">
-  <figcaption><b>Figure 3.</b> Cosine similarity between the learned positional embedding of one query position (red square) and those of all 196 patch positions. Positions in the same row or column are clearly more similar: adjacent positions have a mean similarity of 0.73, positions at least 10 grid steps apart −0.04. The model was never told that its tokens form a 14×14 grid; it learned this layout during training.</figcaption>
+  <figcaption><b>Figure 3.</b> Cosine similarity between the learned positional embedding of one query position (red square) and the embeddings of all 196 patch positions. Positions in the same row or column are clearly more similar. Adjacent positions have a mean similarity of 0.73, and positions at least 10 grid steps apart have −0.04. The model was never told that its tokens form a 14×14 grid, but it learned this layout during training.</figcaption>
 </figure>
 </section>
 
 <!-- ============================================================ 5 -->
 <section id="vit-results">
 <h2><span class="num">5</span>ViT classification results</h2>
-<p>All 20 images were preprocessed with <code>weights.transforms()</code> and passed through the model as one batch, giving a 20 × 1000 matrix of logits that a softmax converts to probabilities over all 1,000 ImageNet classes. For every image we recorded the top-5 classes and probabilities, the predicted ImageNet label, and the probability and rank of the correct class.</p>
+<p>I preprocessed all 20 images with <code>weights.transforms()</code> and passed them through the model as one batch. This gives a 20 × 1000 matrix of logits, and a softmax turns them into probabilities over all 1,000 ImageNet classes. For every image I recorded the top-5 classes and probabilities, the predicted ImageNet label, and the probability and rank of the correct class.</p>
 <div class="table-wrap">
 <table>
   <caption>Table 5. Unrestricted 1,000-class results (primary metric).</caption>
@@ -188,13 +188,13 @@
     <tr><td>Top-1 accuracy</td><td><b>85% (17 / 20)</b></td></tr>
     <tr><td>Top-5 accuracy</td><td>100% (20 / 20)</td></tr>
     <tr><td>Top-1 by class</td><td>golden retriever 4/4 · tabby 2/4 · sports car 4/4 · mountain bike 4/4 · coffee mug 3/4</td></tr>
-    <tr><td>Supplementary: argmax restricted to the five classes</td><td>100% (20 / 20) — a different, easier question; not the required metric</td></tr>
+    <tr><td>Supplementary: argmax restricted to the five classes</td><td>100% (20 / 20), a different and easier question, not the required metric</td></tr>
   </tbody>
 </table>
 </div>
 <figure class="medium">
   <img src="figures/p1t2_vit_confusion_5x6.png" alt="Confusion table with five true classes as rows and six predicted columns: the five classes plus Other ImageNet class." loading="lazy">
-  <figcaption><b>Figure 4.</b> Confusion table of top-1 predictions over all 1,000 classes. A prediction is counted in a class column only if it is exactly that ImageNet class; every other class is counted in <b>Other ImageNet class</b>. The three "other" predictions are <code>Egyptian cat</code> (twice) and <code>cup</code>.</figcaption>
+  <figcaption><b>Figure 4.</b> Confusion table of top-1 predictions over all 1,000 classes. A prediction only counts in a class column if it's exactly that ImageNet class, and every other class is counted in <b>Other ImageNet class</b>. The three "other" predictions are <code>Egyptian cat</code> (twice) and <code>cup</code>.</figcaption>
 </figure>
 <div class="table-wrap">
 <table class="dense">
@@ -229,14 +229,14 @@
   <figcaption><b>Figure 5.</b> All 20 images with the ViT top-1 prediction and its probability (green ✓ correct, red ✗ incorrect).</figcaption>
 </figure>
 <h3>What the fixed 1,000-class output cannot express</h3>
-<p>The model can only answer with one of the 1,000 classes it was trained on. It cannot describe a scene ("three riders with bikes on a mountain"), name a class it has never seen, or answer "none of these"; the softmax always distributes all probability over the same 1,000 classes, even for an image that matches none of them. ImageNet also contains overlapping or nested categories — <i>tabby</i> / <i>tiger cat</i> / <i>Egyptian cat</i>, <i>cup</i> / <i>coffee mug</i>, <i>sports car</i> / <i>convertible</i> / <i>racer</i> — and all three errors in Figure 4 are between such neighbors, so the unrestricted accuracy penalizes answers a person might accept. Asking about a different set of classes would require retraining the classification head.</p>
-<p class="note">No probability exceeds about 0.91. The documented training recipe for this checkpoint uses label smoothing (0.11) together with mixup and cutmix, which discourage probabilities close to 1, so these values should not be read as calibrated confidence.</p>
+<p>One thing I noticed is that the model can only answer with one of the 1,000 classes it was trained on. It can't describe a scene like "three riders with bikes on a mountain," it can't name a class it has never seen, and it can't answer "none of these." The softmax always spreads all of the probability over the same 1,000 classes, even when an image doesn't match any of them. Another issue is that ImageNet has a lot of classes that overlap, like <i>tabby</i>, <i>tiger cat</i> and <i>Egyptian cat</i>, or <i>cup</i> and <i>coffee mug</i>, or <i>sports car</i>, <i>convertible</i> and <i>racer</i>. All three errors in Figure 4 are between classes like these, so I think the unrestricted accuracy actually penalizes answers that a person might accept. If I wanted to ask about a different set of classes, the classification head would have to be retrained.</p>
+<p class="note">No probability goes above about 0.91. The documented training recipe for this checkpoint uses label smoothing (0.11) along with mixup and cutmix, and these discourage probabilities close to 1. So these values shouldn't be read as calibrated confidence.</p>
 </section>
 
 <!-- ============================================================ 6 -->
 <section id="clip-similarity">
 <h2><span class="num">6</span>CLIP similarity implementation and numerical verification</h2>
-<p>CLIP has two separate encoders, <i>f</i> for images and <i>g</i> for texts, which map into the same 512-dimensional space. For <i>N</i> images and <i>M</i> candidate texts we implemented:</p>
+<p>CLIP has two separate encoders, <i>f</i> for images and <i>g</i> for texts, and both map into the same 512-dimensional space. For <i>N</i> images and <i>M</i> candidate texts, I implemented:</p>
 <math display="block">
   <msub><mi>u</mi><mi>i</mi></msub><mo>=</mo>
   <mfrac><mrow><mi>f</mi><mo>(</mo><msub><mi>x</mi><mi>i</mi></msub><mo>)</mo></mrow>
@@ -260,7 +260,7 @@
   <msub><mover><mi>y</mi><mo>^</mo></mover><mi>i</mi></msub><mo>=</mo>
   <munder><mrow><mi>arg</mi><mo>⁡</mo><mi>max</mi></mrow><mi>j</mi></munder><msub><mi>P</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub>
 </math>
-<p>where τ is the checkpoint's learned <code>logit_scale</code> and the softmax runs over the candidate texts <i>k</i> (the row maximum is subtracted before exponentiating for numerical stability).</p>
+<p>where τ is the checkpoint's learned <code>logit_scale</code> and the softmax runs over the candidate texts <i>k</i> (the row maximum is subtracted before exponentiating so the calculation stays numerically stable).</p>
 <div class="table-wrap">
 <table>
   <caption>Table 7. The computation step by step (20 images, five texts, template <code>a photo of a {category}</code>).</caption>
@@ -277,7 +277,7 @@
 </table>
 </div>
 <h3>Verification against CLIP's built-in output</h3>
-<p><code>clip.load</code> keeps the checkpoint's native FP16 weights on the GPU. We compared our logits with <code>logits_per_image</code> from CLIP's own forward pass, always within the same precision.</p>
+<p><code>clip.load</code> keeps the checkpoint's native FP16 weights on the GPU. I compared my logits with <code>logits_per_image</code> from CLIP's own forward pass, and I always compared them within the same precision.</p>
 <div class="table-wrap">
 <table>
   <caption>Table 8. Manual vs. built-in logits (20 images × 5 texts).</caption>
@@ -288,7 +288,7 @@
   </tbody>
 </table>
 </div>
-<p>In FP16 the difference is exactly one rounding step (FP16 numbers between 16 and 32 are 2<sup>−6</sup> ≈ 0.0156 apart); it arises because CLIP multiplies the scale into the image features before the matrix product. FP16 and FP32 logits differ by at most 0.034 and give the same predictions. Because FP32 fits easily in the 4 GiB GPU, all remaining CLIP experiments use FP32, where the manual logits agree with the built-in logits within the chosen tolerance of 10<sup>−4</sup>. Our softmax matches PyTorch's within 1.2×10<sup>−9</sup>, and cached image embeddings are identical to freshly computed ones. The cache is keyed on the model, CLIP commit, precision, preprocessing and the checksum of every image, so any change invalidates it.</p>
+<p>In FP16 the difference is exactly one rounding step (FP16 numbers between 16 and 32 are 2<sup>−6</sup> ≈ 0.0156 apart). This happens because CLIP multiplies the scale into the image features before the matrix product. FP16 and FP32 logits differ by at most 0.034 and they give the same predictions. Because FP32 fits easily in the 4 GiB GPU, I used FP32 for all the other CLIP experiments, and there the manual logits agree with the built-in logits within the tolerance I chose of 10<sup>−4</sup>. My softmax matches PyTorch's within 1.2×10<sup>−9</sup>, and the cached image embeddings are identical to freshly computed ones. The cache is keyed on the model, CLIP commit, precision, preprocessing and the checksum of every image, so any change makes it invalid.</p>
 </section>
 
 <!-- ============================================================ 7 -->
@@ -299,22 +299,22 @@
   <figcaption><b>Figure 6.</b> One image per class against the five candidate texts, shown as cosine similarities, logits and softmax probabilities.</figcaption>
 </figure>
 <ul>
-  <li><b>Cosine similarity</b> measures the angle between two unit vectors and lies in [−1, 1]. CLIP's image–text cosines are small (here 0.12–0.32), and the correct text leads the best wrong text by only 0.06–0.14.</li>
-  <li><b>Logits</b> multiply the cosines by the learned constant e<sup>τ</sup> = 100. This keeps the ranking but stretches the gaps: a cosine gap of 0.1 becomes a logit gap of 10.</li>
-  <li><b>Softmax probabilities</b> exponentiate and normalize the logits across the candidate texts in each row. A logit gap of 10 becomes a probability ratio of e<sup>10</sup> ≈ 22,000, which is why the probabilities are almost exactly 0 or 1.</li>
+  <li><b>Cosine similarity</b> measures the angle between two unit vectors and is always in [−1, 1]. CLIP's image–text cosines are small (here 0.12–0.32), and the correct text is only ahead of the best wrong text by 0.06–0.14.</li>
+  <li><b>Logits</b> multiply the cosines by the learned constant e<sup>τ</sup> = 100. This keeps the ranking the same but stretches the gaps, so a cosine gap of 0.1 becomes a logit gap of 10.</li>
+  <li><b>Softmax probabilities</b> exponentiate and normalize the logits across the candidate texts in each row. A logit gap of 10 turns into a probability ratio of e<sup>10</sup> ≈ 22,000, which is why the probabilities are almost exactly 0 or 1.</li>
 </ul>
 <h3>Why probabilities depend on the candidate texts</h3>
 <figure>
   <img src="figures/p2t1_candidate_set_effect.png" alt="Bar charts of probabilities for one tabby cat image under three candidate sets, annotated with unchanged cosine similarities." loading="lazy">
-  <figcaption><b>Figure 7.</b> The same image (<code>tabby_cat_02</code>) scored against three candidate sets. The cosine similarity to each text is identical in every set; only the probabilities change.</figcaption>
+  <figcaption><b>Figure 7.</b> The same image (<code>tabby_cat_02</code>) scored against three candidate sets. The cosine similarity to each text is the same in every set, and only the probabilities change.</figcaption>
 </figure>
-<p>The softmax normalizes over whatever texts are supplied. With the five classes, <i>tabby cat</i> receives probability 0.9998. When the correct text is removed, the softmax must still distribute all probability among wrong texts, and <i>golden retriever</i> receives 0.585 although its cosine similarity (0.212) is far below that of the removed correct text (0.305). Adding <i>tiger cat</i> and <i>kitten</i> lowers <i>tabby cat</i> to 0.951, mostly in favor of <i>tiger cat</i> (0.046). A CLIP probability is therefore relative to the candidate list, not an absolute measure of how well a text describes the image.</p>
+<p>The softmax normalizes over whatever texts it's given. With the five classes, <i>tabby cat</i> gets a probability of 0.9998. But when the correct text is removed, the softmax still has to spread all the probability over the wrong texts, and <i>golden retriever</i> gets 0.585 even though its cosine similarity (0.212) is a lot lower than the removed correct text (0.305). Adding <i>tiger cat</i> and <i>kitten</i> lowers <i>tabby cat</i> to 0.951, and most of that goes to <i>tiger cat</i> (0.046). This shows that a CLIP probability is relative to the candidate list, and it isn't an absolute measure of how well a text describes the image.</p>
 </section>
 
 <!-- ============================================================ 8 -->
 <section id="prompts">
 <h2><span class="num">8</span>Prompt wording comparison</h2>
-<p>All 20 images were classified with three templates, always with the same candidate order (golden retriever, tabby cat, sports car, mountain bike, coffee mug). The image embeddings are computed once; only the five text embeddings change between templates.</p>
+<p>I classified all 20 images with three templates, always using the same candidate order (golden retriever, tabby cat, sports car, mountain bike, coffee mug). The image embeddings are only computed once, and the only thing that changes between templates is the five text embeddings.</p>
 <div class="table-wrap">
 <table>
   <caption>Table 9. Zero-shot results by template. The logit margin is the correct-class logit minus the largest competing logit; a margin of <i>m</i> means the correct class is e<sup><i>m</i></sup> times more probable than its strongest competitor.</caption>
@@ -330,15 +330,15 @@
   <img src="figures/p2t2_prompt_confusion_matrices.png" alt="Three identical diagonal 5 by 5 confusion matrices, one per prompt template." loading="lazy">
   <figcaption><b>Figure 8.</b> Confusion matrices for the three templates. All are diagonal with four images per class.</figcaption>
 </figure>
-<p><b>Changed predictions.</b> None: the five classes are visually very different, so every template classifies every image correctly.</p>
-<p><b>Changed scores.</b> The wording changes every score. <code>an image showing a {category}</code> gives the largest margin for all 20 images, and the bare class name gives the smallest margin for 15 of the 20 (for the other five, <code>a photo of a {category}</code> is lowest). The largest margin changes are <code>tabby_cat_02</code> (8.2 → 12.2), <code>mountain_bike_03</code> (6.6 → 10.2) and <code>tabby_cat_03</code> (7.1 → 10.7). Because every margin is above 5.9, the correct-class probability exceeds 0.997 everywhere, and the changes appear only in the third or fourth decimal (largest: <code>mountain_bike_01</code>, 0.9971 → 0.9999). A higher correct-class cosine alone does not imply a larger margin, because the template also moves the competing texts: for <code>sports_car_02</code>, <code>a photo of a …</code> gives the higher correct-class cosine, but <code>an image showing a …</code> gives the larger margin.</p>
+<p><b>Changed predictions.</b> There weren't any. The five classes look really different from each other, so every template classifies every image correctly.</p>
+<p><b>Changed scores.</b> The wording does change every score though. <code>an image showing a {category}</code> gives the largest margin for all 20 images, and the plain class name gives the smallest margin for 15 of the 20 (for the other five, <code>a photo of a {category}</code> is the lowest). The biggest margin changes are <code>tabby_cat_02</code> (8.2 → 12.2), <code>mountain_bike_03</code> (6.6 → 10.2) and <code>tabby_cat_03</code> (7.1 → 10.7). Every margin is above 5.9, so the correct-class probability is above 0.997 everywhere, and the changes only show up in the third or fourth decimal (the largest is <code>mountain_bike_01</code>, 0.9971 → 0.9999). Another thing I noticed is that a higher correct-class cosine doesn't automatically mean a larger margin, because the template also moves the competing texts. For <code>sports_car_02</code>, <code>a photo of a …</code> gives the higher correct-class cosine, but <code>an image showing a …</code> gives the larger margin.</p>
 <figure>
   <img src="figures/p2t2_prompt_cosine_and_margin.png" alt="Dot plots for each of the 20 images showing correct-class cosine similarity and logit margin under the three templates." loading="lazy">
   <figcaption><b>Figure 9.</b> Per-image correct-class cosine similarity (left) and logit margin (right) under each template. Grey bars span the range across templates.</figcaption>
 </figure>
-<p class="note"><strong>Supplementary — harder candidate list.</strong> Adding five confusable distractors (<i>Labrador retriever</i>, <i>Egyptian cat</i>, <i>convertible</i>, <i>road bike</i>, <i>cup</i>) gives 19/20 correct for every template. The single error is the same for all three: <code>mountain_bike_01</code> is labeled <i>road bike</i> (correct-class probability 0.18–0.28). Even here the wording changed confidence but no prediction.</p>
+<p class="note"><strong>Supplementary: harder candidate list.</strong> When I added five distractors that are easy to confuse with my classes (<i>Labrador retriever</i>, <i>Egyptian cat</i>, <i>convertible</i>, <i>road bike</i>, <i>cup</i>), every template got 19/20 correct. The one error is the same for all three: <code>mountain_bike_01</code> is labeled <i>road bike</i> (correct-class probability 0.18–0.28). Even here, the wording changed the confidence but not any prediction.</p>
 <h3>Why changing a prompt is not fine-tuning</h3>
-<p>All CLIP parameters stay frozen (no gradients, evaluation mode), and the image embeddings are identical for all templates. Changing the template only changes the input text and therefore the five text vectors <i>v<sub>j</sub></i> that act as classifier weights. Fine-tuning would instead update the model's parameters with gradient descent on labeled data, permanently changing the encoders.</p>
+<p>All of CLIP's parameters stay frozen (no gradients, evaluation mode), and the image embeddings are the same for every template. Changing the template only changes the input text, which changes the five text vectors <i>v<sub>j</sub></i> that basically act as the classifier weights. Fine-tuning is different because it would update the model's parameters with gradient descent on labeled data, which permanently changes the encoders.</p>
 </section>
 
 <!-- ============================================================ 9 -->
@@ -367,7 +367,7 @@
   </tbody>
 </table>
 </div>
-<p><b>Grouping by class.</b> Every image's nearest neighbor belongs to its own class (20/20). The mean within-class similarity is 0.766 (range 0.539–0.894, 30 pairs); the mean between-class similarity is 0.503 (range 0.365–0.771, 160 pairs).</p>
+<p><b>Grouping by class.</b> Every image's nearest neighbor is in its own class (20/20). The mean within-class similarity is 0.766 (range 0.539–0.894, 30 pairs), and the mean between-class similarity is 0.503 (range 0.365–0.771, 160 pairs).</p>
 <figure>
   <img src="figures/p2t3_similar_pairs.jpg" alt="Three rows of image pairs: most similar same-class pairs, least similar same-class pairs, and most similar different-class pairs, each with its cosine similarity." loading="lazy">
   <figcaption><b>Figure 11.</b> Image pairs ranked by cosine similarity: the most similar pairs within a class (top), the least similar pairs within a class (middle), and the most similar pairs across classes (bottom).</figcaption>
@@ -379,14 +379,14 @@
   </figure>
   <figure>
     <img src="figures/p2t3_pca_projection.png" alt="Scatter plot of the 20 embeddings on two principal components; animals, vehicles and mugs form separate groups." loading="lazy">
-    <figcaption><b>Figure 13.</b> Embeddings projected on two principal components (23% and 17% of the variance). Distances here are approximate; Figure 10 is the exact measurement.</figcaption>
+    <figcaption><b>Figure 13.</b> Embeddings projected onto two principal components (23% and 17% of the variance). The distances here are only approximate, and Figure 10 is the exact measurement.</figcaption>
   </figure>
 </div>
 <h3>Interpretation</h3>
-<p><b>Similar images within a category.</b> The most similar pairs are tabby cats: <code>tabby_cat_01</code>–<code>tabby_cat_04</code> (0.894) and <code>tabby_cat_01</code>–<code>tabby_cat_02</code> (0.892). Their backgrounds differ (pavement, grass, snow), but each shows a striped cat facing the camera and filling much of the frame. Among the mugs, the two close-ups of a mug of black coffee on a wooden table (<code>coffee_mug_01</code>, <code>coffee_mug_04</code>) are the most similar pair (0.873), so similar composition and setting also raise similarity.</p>
-<p><b>Dissimilar images within a category.</b> <code>mountain_bike_04</code> is the outlier of its class (mean 0.600 with the other bikes; 0.539 with <code>mountain_bike_01</code>). The other bike photos show a single parked bike; this one shows three riders in protective gear on a mountain road with a chairlift and a wide landscape. <code>golden_retriever_03</code> (an agility jump in an arena) is likewise the least typical dog (mean 0.733).</p>
-<p><b>Unexpectedly similar images across categories.</b> The five most similar cross-class pairs are all dog–cat pairs, led by <code>golden_retriever_02</code>–<code>tabby_cat_04</code> (0.771). The mean dog–cat similarity (0.686) is as high as the mean similarity within the mountain-bike class (0.684). That pair shares neither color (an orange dog on a red floor against a yellow wall; a grey striped cat on grass) nor background, so the similarity is better explained by both images showing a furry pet animal. Sports cars are the most isolated class (mean 0.44–0.46 to the other classes), and their most similar non-car image is always <code>mountain_bike_02</code> (up to 0.573), consistent with a broad "vehicle" grouping.</p>
-<p><b>What the representation captures.</b> In these examples the embedding mainly reflects the semantic category of the main object and broader groups (animals vs. vehicles). It also reflects scene content and composition (the multi-person mountain scene; matching close-up mug photos). We found no evidence that color dominates: high-similarity pairs often differ in color, and the red Ferrari F430 and the red-orange dog photo have a similarity of only 0.39. With only 30 within-class pairs, and with object, background and composition varying together in these photos, their separate effects cannot be isolated; cosine values also have no absolute meaning (even unrelated images here score at least 0.36), so only comparisons are informative.</p>
+<p><b>Similar images within a category.</b> The most similar pairs are tabby cats: <code>tabby_cat_01</code>–<code>tabby_cat_04</code> (0.894) and <code>tabby_cat_01</code>–<code>tabby_cat_02</code> (0.892). Their backgrounds are different (pavement, grass, snow), but each one shows a striped cat facing the camera and filling a lot of the frame. For the mugs, the two close-ups of a mug of black coffee on a wooden table (<code>coffee_mug_01</code>, <code>coffee_mug_04</code>) are the most similar pair (0.873). I think this shows that a similar composition and setting also raise the similarity.</p>
+<p><b>Dissimilar images within a category.</b> <code>mountain_bike_04</code> is the outlier in its class (mean 0.600 with the other bikes, and 0.539 with <code>mountain_bike_01</code>). The other bike photos each show a single parked bike, but this one shows three riders in protective gear on a mountain road with a chairlift and a wide landscape. <code>golden_retriever_03</code> (an agility jump in an arena) is also the least typical dog (mean 0.733).</p>
+<p><b>Unexpectedly similar images across categories.</b> The five most similar cross-class pairs are all dog–cat pairs, and the top one is <code>golden_retriever_02</code>–<code>tabby_cat_04</code> (0.771). The mean dog–cat similarity (0.686) is about as high as the mean similarity inside the mountain bike class (0.684). That pair doesn't share color (an orange dog on a red floor against a yellow wall, and a grey striped cat on grass) or background, so I think the similarity is better explained by both images showing a furry pet animal. Sports cars are the most isolated class (mean 0.44–0.46 to the other classes), and their most similar non-car image is always <code>mountain_bike_02</code> (up to 0.573), which fits with a broad "vehicle" grouping.</p>
+<p><b>What the representation captures.</b> In these examples, the embedding mainly reflects the category of the main object, and also broader groups like animals vs. vehicles. It also reflects scene content and composition (the mountain scene with multiple people, and the matching close-up mug photos). I didn't find any evidence that color dominates. A lot of the high-similarity pairs are different colors, and the red Ferrari F430 and the red-orange dog photo only have a similarity of 0.39. There are only 30 within-class pairs, and the object, background and composition all vary together in these photos, so their separate effects can't be isolated. Cosine values also don't have an absolute meaning (even unrelated images here score at least 0.36), so only comparisons between them are informative.</p>
 </section>
 
 <!-- ============================================================ 10 -->
@@ -398,21 +398,21 @@
 </figure>
 <h3>Successful predictions</h3>
 <ul>
-  <li><code>sports_car_01</code> (red Ferrari F430 at an outdoor car show): <i>sports car</i> with probability 0.910; the next classes, <i>convertible</i> (0.010) and <i>car wheel</i> (0.009), are related car concepts.</li>
-  <li><code>mountain_bike_01</code> (full-suspension bike against a brick wall): <i>mountain bike</i> with 0.907; the runner-up, <i>disk brake</i> (0.005), is a part visible on the bike.</li>
-  <li>All four golden retrievers are correct (0.863–0.890), including <code>golden_retriever_04</code>, where the dog is small and standing in a lake. Their second choices are other dog breeds (Irish setter for the dark-red <code>golden_retriever_02</code>, cocker spaniel for <code>golden_retriever_04</code>).</li>
+  <li><code>sports_car_01</code> (red Ferrari F430 at an outdoor car show) is predicted as <i>sports car</i> with probability 0.910. The next classes, <i>convertible</i> (0.010) and <i>car wheel</i> (0.009), are related car concepts.</li>
+  <li><code>mountain_bike_01</code> (full-suspension bike against a brick wall) gets <i>mountain bike</i> with 0.907, and the runner-up, <i>disk brake</i> (0.005), is a part you can see on the bike.</li>
+  <li>All four golden retrievers are correct (0.863–0.890), including <code>golden_retriever_04</code>, where the dog is small and standing in a lake. Their second choices are other dog breeds (Irish setter for the dark-red <code>golden_retriever_02</code>, and cocker spaniel for <code>golden_retriever_04</code>).</li>
 </ul>
 <h3>Incorrect predictions</h3>
 <ul>
-  <li><code>tabby_cat_01</code> (grey striped cat on pavement) → <i>Egyptian cat</i> (0.894); <i>tabby</i> is second with 0.018. <code>tabby_cat_02</code> (brown tabby on snow) → <i>Egyptian cat</i> (0.581), with <i>tabby</i> 0.173 and <i>tiger cat</i> 0.159. The three ImageNet domestic-cat classes together receive 0.925 and 0.913: the model recognizes a domestic cat but splits these overlapping coat-pattern classes differently from our labels.</li>
-  <li><code>coffee_mug_03</code> (white mug held in a hand outdoors) → <i>cup</i> (0.328), with <i>coffee mug</i> close behind (0.263); the two classes are near-synonyms.</li>
+  <li><code>tabby_cat_01</code> (grey striped cat on pavement) → <i>Egyptian cat</i> (0.894), and <i>tabby</i> is second with only 0.018. <code>tabby_cat_02</code> (brown tabby on snow) → <i>Egyptian cat</i> (0.581), with <i>tabby</i> at 0.173 and <i>tiger cat</i> at 0.159. The three ImageNet domestic cat classes together get 0.925 and 0.913. This shows the model does recognize a domestic cat, but it splits these overlapping coat-pattern classes differently than my labels do.</li>
+  <li><code>coffee_mug_03</code> (white mug held in a hand outdoors) → <i>cup</i> (0.328), with <i>coffee mug</i> close behind (0.263). These two classes mean almost the same thing.</li>
 </ul>
 <h3>Uncertain correct predictions</h3>
 <ul>
-  <li><code>tabby_cat_03</code>: <i>tabby</i> 0.335 vs. <i>tiger cat</i> 0.288; the cat is partly hidden by leaves.</li>
+  <li><code>tabby_cat_03</code>: <i>tabby</i> 0.335 vs. <i>tiger cat</i> 0.288, and the cat is partly hidden by leaves.</li>
   <li><code>sports_car_04</code>: <i>sports car</i> 0.391 vs. <i>convertible</i> 0.263 (black Ferrari Testarossa).</li>
 </ul>
-<p>For CLIP, every image was classified correctly with all three templates; its least confident cases are discussed through the logit margins in Section 8.</p>
+<p>For CLIP, every image was classified correctly with all three templates, so I looked at its least confident cases through the logit margins in Section 8.</p>
 </section>
 
 <!-- ============================================================ 11 -->
@@ -420,7 +420,7 @@
 <h2><span class="num">11</span>Model comparison and limitations</h2>
 <div class="table-wrap">
 <table>
-  <caption>Table 11. Accuracy on the 20 images. The rows answer different questions and are not directly comparable.</caption>
+  <caption>Table 11. Accuracy on the 20 images. The rows answer different questions, so they aren't directly comparable.</caption>
   <thead><tr><th>Model</th><th>Decision among</th><th class="num">Accuracy</th></tr></thead>
   <tbody>
     <tr><td>ViT-B/16</td><td>1,000 ImageNet classes (primary)</td><td class="num">85%</td></tr>
@@ -431,20 +431,20 @@
 </table>
 </div>
 <ul>
-  <li><b>Different questions.</b> ViT chooses among 1,000 classes; CLIP chooses among five texts that we wrote. When ViT is also restricted to the five classes, it is correct on all 20 images too.</li>
-  <li><b>Training objectives.</b> ViT learns to map an image to one of 1,000 fixed labels with cross-entropy. CLIP learns, with a contrastive loss, to place matching images and captions close together in a shared space, so new classes can be expressed as text at test time without changing any weights.</li>
-  <li><b>Training data.</b> ViT was trained on ImageNet-1k (≈1.28 M images with human labels); CLIP on 400 M image–text pairs collected from the internet. CLIP's training data is much larger, less curated and not public, so overlap with our test images cannot be checked.</li>
-  <li><b>Candidate-label sets.</b> ViT's errors (<i>Egyptian cat</i>, <i>cup</i>) are ImageNet classes that are simply absent from CLIP's five-candidate list; part of CLIP's apparent advantage here comes from the smaller, user-chosen candidate set. In the supplementary 10-candidate test, CLIP chose <i>tabby cat</i> over <i>Egyptian cat</i> for all four cats; whether this reflects the models or the difference between ImageNet's class definitions and everyday usage cannot be decided from 20 images.</li>
-  <li><b>Architecture.</b> ViT-B/16 sees 196 patch tokens of 16×16 pixels; CLIP ViT-B/32 sees 49 patch tokens of 32×32 pixels.</li>
-  <li><b>Small dataset.</b> With 20 images, one image is worth 5 percentage points, and four images per class cannot represent the variation within a class. These results describe these 20 photographs only and do not show that either model is generally better.</li>
-  <li><b>Selection and preprocessing.</b> Wikimedia Commons photos tend to be well lit and centered, which probably makes the task easier than everyday photos; some may even appear in the models' training data. Both models see only the center crop. ViT probabilities are affected by label smoothing and CLIP probabilities by the candidate list, so neither is a calibrated confidence.</li>
+  <li><b>Different questions.</b> ViT chooses between 1,000 classes, but CLIP chooses between five texts that I wrote. When ViT is also restricted to the five classes, it gets all 20 images correct too.</li>
+  <li><b>Training objectives.</b> ViT learns to map an image to one of 1,000 fixed labels using cross-entropy. CLIP learns with a contrastive loss to put matching images and captions close together in a shared space, which means new classes can be written as text at test time without changing any weights.</li>
+  <li><b>Training data.</b> ViT was trained on ImageNet-1k (≈1.28 M images with human labels), and CLIP was trained on 400 M image–text pairs collected from the internet. CLIP's training data is a lot bigger, less curated and not public, so I can't check whether it overlaps with my test images.</li>
+  <li><b>Candidate-label sets.</b> ViT's errors (<i>Egyptian cat</i>, <i>cup</i>) are ImageNet classes that just aren't in CLIP's five-candidate list, so I think part of what looks like CLIP's advantage here comes from the smaller candidate set that I chose. In the supplementary 10-candidate test, CLIP picked <i>tabby cat</i> over <i>Egyptian cat</i> for all four cats. But whether this is because of the models or because of the difference between ImageNet's class definitions and everyday usage can't be decided from 20 images.</li>
+  <li><b>Architecture.</b> ViT-B/16 sees 196 patch tokens of 16×16 pixels, while CLIP ViT-B/32 sees 49 patch tokens of 32×32 pixels.</li>
+  <li><b>Small dataset.</b> With 20 images, one image is worth 5 percentage points, and four images per class can't represent all the variation inside a class. These results only describe these 20 photographs, and they don't show that either model is generally better.</li>
+  <li><b>Selection and preprocessing.</b> Wikimedia Commons photos are usually well lit and centered, which probably makes the task easier than everyday photos, and some of them might even be in the models' training data. Both models only see the center crop. ViT probabilities are affected by label smoothing and CLIP probabilities by the candidate list, so neither one is a calibrated confidence.</li>
 </ul>
 </section>
 
 <!-- ============================================================ 12 -->
 <section id="conclusion">
 <h2><span class="num">12</span>Conclusion</h2>
-<p>A ViT turns a 224×224 image into 196 patch tokens plus a learned CLS token; our manually extracted patches, multiplied by the model's learned projection, reproduce its patch embeddings, and its learned positional embeddings encode the 2-D patch grid. On 20 images from five ImageNet classes, ViT-B/16 reached 85% top-1 accuracy over all 1,000 classes, and all three errors were between overlapping ImageNet categories. For CLIP, our step-by-step implementation of normalization, cosine similarity, learned scaling and softmax matches the built-in output to within 5.7×10<sup>−6</sup> in FP32. All three prompt templates classified every image correctly; the wording did not change any prediction but consistently changed the logit margins, with <code>an image showing a {category}</code> giving the largest margin for every image. CLIP's image embeddings group the photos by class and by broader concepts such as animals and vehicles, and they are also sensitive to scene content and composition. These observations are limited to a small, hand-picked set of photographs and should not be generalized to a ranking of the two models.</p>
+<p>Overall, a ViT turns a 224×224 image into 196 patch tokens plus a learned CLS token. My manually extracted patches, multiplied by the model's learned projection, reproduce its patch embeddings, and its learned positional embeddings encode the 2-D patch grid. On 20 images from five ImageNet classes, ViT-B/16 got 85% top-1 accuracy over all 1,000 classes, and all three errors were between overlapping ImageNet categories. For CLIP, my step-by-step implementation of normalization, cosine similarity, learned scaling and softmax matches the built-in output within 5.7×10<sup>−6</sup> in FP32. All three prompt templates classified every image correctly. The wording didn't change any prediction, but it consistently changed the logit margins, and <code>an image showing a {category}</code> gave the largest margin for every image. CLIP's image embeddings group the photos by class and by broader concepts like animals and vehicles, and they're also sensitive to scene content and composition. These observations are limited to a small, hand-picked set of photographs, so they shouldn't be generalized into a ranking of the two models.</p>
 </section>
 
 <!-- ============================================================ 13 -->
@@ -460,7 +460,7 @@
 </ol>
 
 <h3 id="attribution">Image attribution</h3>
-<p>All photographs are from Wikimedia Commons. In the figures they are resized and center-cropped or arranged in grids; each photograph remains under its original license.</p>
+<p>All the photographs are from Wikimedia Commons. In the figures they are resized and center-cropped or arranged in grids, and each photograph is still under its original license.</p>
 <div class="table-wrap">
 <table class="attrib">
   <caption>Table 12. Image sources and licenses.</caption>
@@ -492,12 +492,12 @@
 
 <h3>Reproducibility</h3>
 <ul>
-  <li>The experiments use only fixed public checkpoints in evaluation mode; inference is deterministic for fixed weights and inputs, and re-running the full pipeline reproduced identical predictions.</li>
-  <li>All library versions are pinned in a lock file; the environment is listed in <a href="#environment">Section 3</a>.</li>
-  <li>Image integrity is checked against recorded SHA-256 checksums before every experiment.</li>
+  <li>The experiments only use fixed public checkpoints in evaluation mode. Inference is deterministic for fixed weights and inputs, and re-running the full pipeline gave identical predictions.</li>
+  <li>All library versions are pinned in a lock file, and the environment is listed in <a href="#environment">Section 3</a>.</li>
+  <li>Image integrity is checked against the recorded SHA-256 checksums before every experiment.</li>
   <li>CLIP image embeddings are cached with a key that includes the model, precision, preprocessing and image checksums.</li>
-  <li>Automated tests (32, all passing) cover patch extraction, metrics, the CLIP computation on synthetic tensors, and integration checks against both real checkpoints.</li>
-  <li>The implementation is submitted privately with the course submission and is intentionally not published on this site.</li>
+  <li>Automated tests (32, all passing) cover patch extraction, metrics, the CLIP calculation on synthetic tensors, and integration checks against both real checkpoints.</li>
+  <li>The implementation is submitted privately with the course submission, and I intentionally didn't publish it on this site.</li>
 </ul>
 </section>
 
